@@ -1,0 +1,8 @@
+credentials/
+.env
+Scripts/
+Include/
+Lib/
+*__pycache__*
+share/
+*.cfg
