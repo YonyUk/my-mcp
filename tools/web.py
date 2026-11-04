@@ -1,12 +1,24 @@
 import webless
-import webbrowser
 import urllib.request as ur
-from fastmcp import FastMCP
+import asyncio
+from fastmcp import FastMCP,Context
+from mcp.server.session import ServerSession
 
 mcp = FastMCP('Web Tools')
 
+async def open_browser(url:str,ctx:Context):
+    result = await asyncio.wait_for(
+        ctx.session.elicit_url(
+            message=f'Open {url} directly in your browser?',
+            url=url,
+            elicitation_id='open-url-001'
+        ),
+        timeout=10.0
+    )
+    return result
+
 @mcp.tool
-async def review_url(url:str):
+def review_url(url:str):
     """open the given url and gets its content in HTML format"""
     try:
         return ur.urlopen(url).read()
@@ -14,10 +26,10 @@ async def review_url(url:str):
         return f'Error: {ex}'
 
 @mcp.tool
-async def search_in_web(subject:str):
+def search_in_web(subject:str):
     """gets info from web about the given subject"""
     try:
-        results = (await webless.search(subject)).hits
+        results = asyncio.run(webless.search(subject)).hits
         text_results = [
             f'Title: {hit.title}\nSnippet: {hit.snippet}\nScore: {hit.score}\nURL: {hit.url}'
             for hit in results
@@ -27,10 +39,14 @@ async def search_in_web(subject:str):
         return f'Error: {ex}'
 
 @mcp.tool
-async def open_url_in_browser(url:str):
-    """open the given url in the browser"""
+def open_url_in_browser(url:str,ctx:Context):
+    """open the given url in the client browser"""
     try:
-        opened = webbrowser.open(url)
-        return f'url {url} successfully opened' if opened else 'browser not opened'
+        result = asyncio.run(open_browser(url,ctx))
+        if result.action == 'accept':
+            return f'The user accepted to open the url'
+        elif result.action == "decline":
+            return "The user refused to open the url"
+        return "The user cancelled the request"
     except Exception as ex:
         return f'Error: {ex}'

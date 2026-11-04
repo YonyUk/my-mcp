@@ -1,3 +1,4 @@
+import threading
 from typing import Dict, Tuple
 from apify_client import ApifyClient
 
@@ -191,54 +192,58 @@ class RedditRepository:
 
     _posts:Dict[str,PostApifyResult] = {}
     _comments:Dict[str,Dict[str,CommentApifyResult]] = {}
-    _instance = None
-
-    def __new__(cls):
-        if not cls._instance:
-            cls._instance = super(RedditRepository,cls).__new__(cls)
-        return cls._instance
+    _lock = threading.Lock()
 
     @classmethod
     def add_post(cls,post:PostApifyResult):
-        cls._posts[post.result_id] = post
+        with cls._lock:
+            cls._posts[post.result_id] = post
 
     @classmethod
     def add_comment_to_post(cls,post_id:str,comment:CommentApifyResult):
-        if not post_id in cls._comments:
-            cls._comments[post_id] = {}
-        cls._comments[post_id][comment.result_id] = comment
+        with cls._lock:
+            cls._comments.setdefault(post_id,{})[comment.result_id] = comment
 
     @classmethod
     def get_post(cls,post_id:str) -> PostApifyResult | None:
-        return cls._posts.get(post_id,None)
+        with cls._lock:
+            return cls._posts.get(post_id,None)
 
     @classmethod
     def get_post_comment(cls,post_id:str,comment_id:str) -> CommentApifyResult | None:
-        return cls._comments.get(post_id,{}).get(comment_id,None)
+        with cls._lock:
+            return cls._comments.get(post_id,{}).get(comment_id,None)
 
     @classmethod
     def get_all_posts(cls) -> List[PostApifyResult]:
-        return list(cls._posts.values())
+        with cls._lock:
+            return list(cls._posts.values())
 
     @classmethod
     def get_all_post_comments(cls,post_id:str) -> List[CommentApifyResult]:
-        return list(cls._comments.get(post_id,{}).values())
+        with cls._lock:
+            return list(cls._comments.get(post_id,{}).values())
 
     @classmethod
     def delete_post(cls,post_id:str):
-        del cls._posts[post_id]
+        with cls._lock:
+            del cls._posts[post_id]
 
     @classmethod
     def delete_post_comment(cls,post_id:str,comment_id:str):
-        del cls._comments[post_id][comment_id]
+        with cls._lock:
+            del cls._comments[post_id][comment_id]
 
 class RedditService:
 
     _instance = None
+    _lock = threading.Lock()
 
     def __new__(cls,*args,**kargs):
         if not cls._instance:
-            cls._instance = super(RedditService,cls).__new__(cls)
+            with cls._lock:
+                if not cls._instance:
+                    cls._instance = super(RedditService,cls).__new__(cls)
         return cls._instance
 
     @classmethod
@@ -248,6 +253,8 @@ class RedditService:
         return cls._instance
 
     def __init__(self) -> None:
+        if not getattr(self,'_service') is None:
+            return
         config = AppConfig.get_config()
         token = config.apify_api_token
         self._actor_id = config.apify_actor_id

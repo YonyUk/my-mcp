@@ -10,7 +10,7 @@ from services.v1.gmail import Mail
 mcp = FastMCP('Reddit Tools')
 
 @mcp.tool
-async def get_reddit_emails():
+def get_reddit_emails():
     """gets the emails sended from Reddit"""
 
     mail_pattern = r'.*<noreply@redditmail\.com>'
@@ -53,7 +53,7 @@ def get_destination_link(href:str) -> str:
     return href
 
 @mcp.tool
-async def review_reddit_email(mail_id:str):
+def review_reddit_email(mail_id:str):
     """gets the content from a email by its id"""
     try:
         posts_links = []
@@ -91,7 +91,7 @@ async def review_reddit_email(mail_id:str):
         return f'Error: {ex}'
 
 @mcp.tool
-async def review_post_url(post_url:str):
+def review_post_url(post_url:str):
     """gets all the necesary information about the post of the given url"""
     try:
         service = RedditService.get_service()
@@ -112,7 +112,7 @@ async def review_post_url(post_url:str):
         return f'Error: {ex}'
 
 @mcp.tool
-async def get_post_content(post_id:str):
+def get_post_content(post_id:str):
     """gets the content of the post with the given id"""
     try:
         post = RedditRepository.get_post(post_id)
@@ -123,7 +123,7 @@ async def get_post_content(post_id:str):
         return f'Error: {ex}'
 
 @mcp.tool
-async def get_post_comments(post_id:str):
+def get_post_comments(post_id:str):
     """gets the comments of the post with the given id"""
     try:
         comments = [

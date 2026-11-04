@@ -1,5 +1,6 @@
 import base64
 import re
+import threading
 from typing import Any, Dict, Iterable, List, Tuple
 from googleapiclient.discovery import build
 
@@ -116,15 +117,26 @@ class Mail:
 class GmailService:
 
     _instance = None
+    _lock = threading.Lock()
+    _local = threading.local()
 
     def __new__(cls,*args,**kwargs):
         if cls._instance is None:
-            cls._instance = super(GmailService, cls).__new__(cls)
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super(GmailService, cls).__new__(cls)
         return cls._instance
 
     def __init__(self) -> None:
-        self._credentials = AppConfig.get_config()._credentials
-        self._service = build('gmail','v1',credentials=self._credentials)
+        if not getattr(self,'_service') is None:
+            return
+
+    @property
+    def _service(self):
+        if not hasattr(self._local,'service'):
+            self._credentials = AppConfig.get_config()._credentials
+            self._local.service = build('gmail','v1',credentials=self._credentials)
+        return self._local.service
 
     @classmethod
     def get_service(cls):
@@ -187,27 +199,26 @@ class GmailService:
             yield mail
 
 class MailRepository:
+    _lock = threading.Lock()
     _mails:Dict[str,Mail] = {}
-    _instance = None
     
-    def __new__(cls,*args,**kwargs):
-        if cls._instance is None:
-            cls._instance = super(MailRepository, cls).__new__(cls)
-        return cls._instance
-
     @classmethod
     def add(cls,*mails:Mail):
-        for mail in mails:
-            cls._mails[mail.id] = mail
+        with cls._lock:
+            for mail in mails:
+                cls._mails[mail.id] = mail
 
     @classmethod
     def get(cls,mail_id:str) -> Mail:
-        return cls._mails[mail_id]
+        with cls._lock:
+            return cls._mails[mail_id]
 
     @classmethod
     def get_all(cls) -> List[Mail]:
-        return list(cls._mails.values())
+        with cls._lock:
+            return list(cls._mails.values())
 
     @classmethod
     def delete(cls,mail_id:str):
-        del cls._mails[mail_id]
+        with cls._lock:
+            del cls._mails[mail_id]
